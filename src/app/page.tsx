@@ -1303,9 +1303,11 @@ export default function Home() {
                       <button
                         type="button"
                         onClick={handleCalculateShipping}
-                        className="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg font-bold hover:bg-blue-200 transition-colors flex items-center gap-1"
+                        className="btn-bounce text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg font-bold hover:bg-blue-200 transition-colors flex items-center gap-1.5"
                       >
-                        <span className="material-symbols-outlined text-sm">my_location</span>
+                        <svg className="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M5.5 3.21V20.8c0 .45.54.67.85.35l4.86-4.86a.5.5 0 0 1 .35-.15h6.87c.45 0 .67-.54.35-.85L6.35 2.86a.5.5 0 0 0-.85.35Z"/>
+                        </svg>
                         Calcular envío con mi ubicación
                       </button>
                       {shippingCalculated && (

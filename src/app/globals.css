@@ -16,3 +16,14 @@ body {
 .material-symbols-outlined {
   font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
 }
+
+@keyframes btn-bounce {
+  0%, 100% { transform: translateY(0); }
+  30%       { transform: translateY(-6px); }
+  60%       { transform: translateY(-3px); }
+  80%       { transform: translateY(-5px); }
+}
+
+.btn-bounce {
+  animation: btn-bounce 1.2s ease-in-out infinite;
+}
