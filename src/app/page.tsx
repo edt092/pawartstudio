@@ -434,7 +434,10 @@ export default function Home() {
         throw new Error("El módulo de pago aún no está listo. Intenta en unos segundos.");
       }
 
-      const totalCO = PRODUCT_PRICE_CO + shippingCost;
+      // Total con comisión Wompi: (subtotal × 2,65% + $700) × 1,19 IVA
+      const subtotal = PRODUCT_PRICE_CO + shippingCost;
+      const baseComm = subtotal * 0.0265 + 700;
+      const totalCO = Math.round(subtotal + baseComm * 1.19);
 
       // 1. Obtener referencia y firma desde el backend
       const sessionRes = await fetch("/api/wompi-payment", {
@@ -531,6 +534,11 @@ export default function Home() {
   const subtotalCO = PRODUCT_PRICE_CO + shippingCost;
   const formatCOP = (n: number) =>
     new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
+  // Comisión Wompi: (subtotal × 2.65% + $700) + IVA 19% sobre la comisión
+  const wompiBaseCommission = subtotalCO * 0.0265 + 700;
+  const wompiIva = wompiBaseCommission * 0.19;
+  const wompiCommission = Math.round(wompiBaseCommission + wompiIva);
+  const wompiTotalCO = subtotalCO + wompiCommission;
 
   return (
     <div className="min-h-screen bg-background-light">
@@ -1407,7 +1415,7 @@ export default function Home() {
                   ) : (
                   /* Resumen de pago — Colombia */
                   <div className="pt-6 border-t border-slate-100 mt-10 space-y-6">
-                    {/* Desglose de precio */}
+                    {/* Desglose base */}
                     <div className="bg-slate-50 rounded-2xl p-5 space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-slate-500">Camiseta personalizada</span>
@@ -1420,28 +1428,79 @@ export default function Home() {
                         </span>
                       </div>
                       <div className="border-t border-slate-200 pt-2 flex justify-between font-bold text-base">
-                        <span>Total</span>
+                        <span>Subtotal</span>
                         <span>{shippingCalculated ? formatCOP(subtotalCO) : "—"}</span>
                       </div>
                     </div>
 
-                    <button
-                      type="submit"
-                      disabled={appState === "submitting_order" || !wompiReady || !shippingCalculated}
-                      className={`w-full py-5 rounded-2xl font-bold text-xl shadow-xl transition-opacity ${
-                        appState === "submitting_order" || !wompiReady || !shippingCalculated
-                          ? "bg-slate-300 text-slate-500 cursor-not-allowed"
-                          : "bg-primary text-white hover:opacity-90"
-                      }`}
-                    >
-                      {appState === "submitting_order"
-                        ? "Preparando pago..."
-                        : !wompiReady
-                        ? "Cargando módulo de pago..."
-                        : !shippingCalculated
-                        ? "Calcula el envío para continuar"
-                        : `Pagar ${formatCOP(subtotalCO)} con Wompi`}
-                    </button>
+                    {/* Opción 1: Wompi */}
+                    <div className="border border-slate-200 rounded-2xl p-5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="font-bold text-sm">Pagar con Wompi</p>
+                        <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-semibold">
+                          +comisión
+                        </span>
+                      </div>
+                      {shippingCalculated && (
+                        <div className="space-y-1 text-xs text-slate-500">
+                          <div className="flex justify-between">
+                            <span>Comisión (2,65% + $700)</span>
+                            <span>+{formatCOP(Math.round(wompiBaseCommission))}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span>IVA 19% sobre comisión</span>
+                            <span>+{formatCOP(Math.round(wompiIva))}</span>
+                          </div>
+                        </div>
+                      )}
+                      <p className="text-3xl font-black text-primary">
+                        {shippingCalculated ? formatCOP(wompiTotalCO) : "—"}
+                      </p>
+                      <button
+                        type="submit"
+                        disabled={appState === "submitting_order" || !wompiReady || !shippingCalculated}
+                        className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-opacity ${
+                          appState === "submitting_order" || !wompiReady || !shippingCalculated
+                            ? "bg-slate-300 text-slate-500 cursor-not-allowed"
+                            : "bg-primary text-white hover:opacity-90"
+                        }`}
+                      >
+                        {appState === "submitting_order"
+                          ? "Preparando pago..."
+                          : !wompiReady
+                          ? "Cargando módulo de pago..."
+                          : !shippingCalculated
+                          ? "Calcula el envío para continuar"
+                          : "Ir a pagar con Wompi"}
+                      </button>
+                    </div>
+
+                    {/* Opción 2: Nequi directo → WhatsApp */}
+                    <div className="border border-green-200 bg-green-50 rounded-2xl p-5 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="font-bold text-sm text-green-800">Pagar con Nequi</p>
+                        <span className="text-xs bg-green-200 text-green-800 px-2 py-1 rounded-full font-semibold">
+                          Sin comisión
+                        </span>
+                      </div>
+                      <p className="text-3xl font-black text-green-700">
+                        {shippingCalculated ? formatCOP(subtotalCO) : "—"}
+                      </p>
+                      <p className="text-xs text-green-700">
+                        Te enviamos el número Nequi por WhatsApp. Una vez confirmes el pago, procesamos tu pedido.
+                      </p>
+                      <a
+                        href="https://wa.me/yourphonenumber"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-2 w-full py-4 rounded-xl font-bold text-lg bg-[#25D366] text-white hover:opacity-90 transition-opacity"
+                      >
+                        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                          <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.767 5.77 0 1.265.407 2.457 1.157 3.44l-1.157 3.39 3.51-1.152c.928.608 2.016.959 3.19.959 3.18 0 5.766-2.585 5.766-5.77 0-3.185-2.586-5.77-5.766-5.77zm4.211 8.24c-.171.482-.98.88-1.341.93-.362.05-.733.09-2.316-.54-1.583-.63-2.583-2.22-2.664-2.33-.081-.11-.663-.88-.663-1.69 0-.81.41-1.21.56-1.37.15-.16.33-.2.44-.2s.22-.01.32-.01c.1 0 .24-.04.37.27.14.33.47 1.15.51 1.24.04.09.06.19 0 .32-.06.13-.09.22-.19.33-.09.11-.2.25-.29.33-.1.09-.2.19-.08.38.11.19.51.84 1.1 1.37.76.68 1.4.89 1.6.99s.32.07.45-.08c.13-.15.54-.63.68-.84.15-.21.29-.18.49-.1s1.31.62 1.54.73c.23.11.38.17.44.27.05.11.05.62-.12 1.1z" />
+                        </svg>
+                        Solicitar datos Nequi por WhatsApp
+                      </a>
+                    </div>
                   </div>
                   )}
                 </form>
