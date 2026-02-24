@@ -23,12 +23,6 @@ const ALL_STYLES = [
       `Create a bold pop art portrait of exactly this ${pet} inspired by Andy Warhol. Use vibrant contrasting colors, bold outlines, halftone dots, retro 1960s aesthetic. The animal must match the reference photo exactly - same breed, pose, and features. ${NO_BG_INSTRUCTION} ${NEGATIVE_PROMPT}`,
   },
   {
-    name: "Óleo Clásico",
-    description: "Texturas profundas y un acabado elegante que nunca pasa de moda.",
-    prompt: (pet: string) =>
-      `Create a classic oil painting portrait of exactly this ${pet}. Use rich textures, deep colors, elegant brushwork reminiscent of Renaissance masters with dramatic lighting. The animal must be identical to the one in the reference photo. ${NO_BG_INSTRUCTION} ${NEGATIVE_PROMPT}`,
-  },
-  {
     name: "Ilustración Digital Fantasía",
     description: "Estilo cinematográfico con colores brillantes y detalles mágicos.",
     prompt: (pet: string) =>
@@ -47,12 +41,6 @@ const ALL_STYLES = [
       `Create a modern geometric art composition of exactly this ${pet}. Use vector art style, sharp defined lines, contrasting colors, minimalist contemporary approach, low-poly aesthetic. The geometric shape must clearly represent the same animal from the reference photo. ${NO_BG_INSTRUCTION} ${NEGATIVE_PROMPT}`,
   },
   {
-    name: "Sticker Kawaii",
-    description: "Estilo sticker adorable con ojos grandes y colores pastel.",
-    prompt: (pet: string) =>
-      `Create a cute kawaii sticker illustration of exactly this ${pet}. Use chibi proportions with an oversized head, huge sparkling eyes, tiny body, soft pastel colors, and a thick white outline around the character like a die-cut sticker. The animal must be the same breed and colors as the reference photo but in an extremely cute simplified kawaii style. ${NO_BG_INSTRUCTION} ${NEGATIVE_PROMPT}`,
-  },
-  {
     name: "Arte Psicodélico",
     description: "Colores neón intensos con patrones fluidos y efecto caleidoscopio.",
     prompt: (pet: string) =>
@@ -65,28 +53,10 @@ const ALL_STYLES = [
       `Create a realistic graphite pencil sketch of exactly this ${pet}. Use detailed pencil strokes for the fur, soft shading, fine linework, black and white classical artistic portrait style. The drawing must capture the exact likeness of the animal in the reference photo. ${NO_BG_INSTRUCTION} ${NEGATIVE_PROMPT}`,
   },
   {
-    name: "Cómic Americano",
-    description: "Líneas gruesas, colores planos vibrantes y efecto de acción dinámico.",
-    prompt: (pet: string) =>
-      `Create a comic book style illustration of exactly this ${pet} as a superhero character. Use thick black outlines, vibrant flat colors, cel shading, dynamic action feel. The animal must be the same breed and look as the reference photo but drawn in comic style. ${NO_BG_INSTRUCTION} ${NEGATIVE_PROMPT}`,
-  },
-  {
     name: "Efecto Papel Rasgado 3D",
     description: "Tu mascota sobresale de un papel roto con efecto tridimensional hiperrealista.",
     prompt: (pet: string) =>
       `Create a hyperrealistic 3D tearing paper effect artwork of exactly this ${pet}. The animal must appear to be breaking through and emerging out of a torn white paper or wall. Include realistic torn paper edges with volumetric shadows and depth. The pet should look three-dimensional, popping out of the surface toward the viewer. Render hyperrealistic fur details with dramatic lighting that emphasizes the 3D depth effect. The torn edges should have realistic paper fiber texture and cast shadows. The animal must be identical to the one in the reference photo - same breed, same colors, same features. ${NEGATIVE_PROMPT}`,
-  },
-  {
-    name: "Dorado Elegante",
-    description: "Retrato artístico con detalles dorados metálicos y acabado premium.",
-    prompt: (pet: string) =>
-      `Create a luxury golden portrait of exactly this ${pet}. Add metallic gold filigree details and ornaments, dark elegant background, gallery-style lighting, premium 8k render, black and gold palette. The animal must be identical to the reference photo. ${NO_BG_INSTRUCTION} ${NEGATIVE_PROMPT}`,
-  },
-  {
-    name: "Vintage Fotografía",
-    description: "Efecto sepia, textura envejecida con estilo clásico del siglo XIX.",
-    prompt: (pet: string) =>
-      `Create a vintage 19th-century portrait of exactly this ${pet}. Apply sepia tone, slight film grain, vignette effect, dignified antique portrait style with warm muted tones. The animal must be the exact same one from the reference photo. ${NO_BG_INSTRUCTION} ${NEGATIVE_PROMPT}`,
   },
   {
     name: "Neon Cyberpunk",
