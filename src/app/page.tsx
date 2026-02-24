@@ -1,8 +1,41 @@
 "use client";
 
-import { useState, useRef, useCallback, lazy, Suspense } from "react";
+import { useState, useRef, useCallback, useEffect, lazy, Suspense } from "react";
 
 const TshirtPreview3D = lazy(() => import("@/components/TshirtPreview3D"));
+import UploadDogIcon from "@/components/icons/UploadDogIcon";
+import AiVersionsIcon from "@/components/icons/AiVersionsIcon";
+import TshirtSelectorIcon from "@/components/icons/TshirtSelectorIcon";
+import DeliveryIcon from "@/components/icons/DeliveryIcon";
+import GoodLightingIcon from "@/components/icons/GoodLightingIcon";
+import ClearFaceIcon from "@/components/icons/ClearFaceIcon";
+import AvoidBlurIcon from "@/components/icons/AvoidBlurIcon";
+import AvoidFarIcon from "@/components/icons/AvoidFarIcon";
+
+// Declaración de tipo para el widget de Wompi
+declare global {
+  interface Window {
+    WidgetCheckout: new (config: {
+      currency: string;
+      amountInCents: number;
+      reference: string;
+      publicKey: string;
+      signature: { integrity: string };
+      customerData?: {
+        email?: string;
+        fullName?: string;
+        phoneNumber?: string;
+        phoneNumberPrefix?: string;
+      };
+    }) => {
+      open: (
+        callback: (result: {
+          transaction: { id: string; status: string } | null;
+        }) => void
+      ) => void;
+    };
+  }
+}
 
 type AppState =
   | "landing"
@@ -13,6 +46,8 @@ type AppState =
   | "tshirt_selected"
   | "order_form"
   | "submitting_order"
+  | "awaiting_payment"
+  | "verifying_payment"
   | "order_created"
   | "generation_failed";
 
@@ -37,6 +72,14 @@ const TSHIRT_COLORS = [
 
 const TSHIRT_SIZES = ["S", "M", "L", "XL", "XXL"];
 
+// Configuración de envíos Ecuador — Bodega: 0°06'03.2"S 78°27'38.1"W
+const WAREHOUSE_COORDS = { lat: -0.100889, lng: -78.460583 };
+const PRODUCT_PRICE_EC = 24.99; // USD
+const SHIPPING_BASE_RATE = 1.50; // tarifa de arranque USD
+const SHIPPING_RATE_PER_KM = 0.35; // USD por km
+const SHIPPING_MIN_RATE = 2.50; // mínimo USD
+const PAYPHONE_COMMISSION_RATE = 0.05; // 5%
+
 export default function Home() {
   const [appState, setAppState] = useState<AppState>("landing");
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
@@ -56,12 +99,98 @@ export default function Home() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [generationCount, setGenerationCount] = useState(0);
   const [usedStyles, setUsedStyles] = useState<string[]>([]);
+  const [userCountry, setUserCountry] = useState<"CO" | "EC">("CO"); // Por defecto Colombia
+  const [shippingCost, setShippingCost] = useState<number>(0);
+  const [shippingCalculated, setShippingCalculated] = useState(false);
+
+  const [wompiReady, setWompiReady] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadSectionRef = useRef<HTMLDivElement>(null);
   const artSectionRef = useRef<HTMLDivElement>(null);
   const tshirtSectionRef = useRef<HTMLDivElement>(null);
   const orderSectionRef = useRef<HTMLDivElement>(null);
+
+  // Detecta el país por IP y carga el script de Wompi al montar el componente
+  useEffect(() => {
+    // Override para testing local: ?country=EC o ?country=CO en la URL
+    const devCountry = new URLSearchParams(window.location.search).get("country");
+    if (devCountry === "EC" || devCountry === "CO") {
+      setUserCountry(devCountry);
+    } else {
+      fetch("https://ipapi.co/json/")
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.country_code === "EC") {
+            setUserCountry("EC");
+          } else {
+            setUserCountry("CO");
+          }
+        })
+        .catch(() => setUserCountry("CO"));
+    }
+
+    const WOMPI_SCRIPT = "https://checkout.wompi.co/widget.js";
+    if (document.querySelector(`script[src="${WOMPI_SCRIPT}"]`)) {
+      setWompiReady(true);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = WOMPI_SCRIPT;
+    script.onload = () => setWompiReady(true);
+    document.head.appendChild(script);
+  }, []);
+
+  // Detectar retorno de PayPhone al montar el componente
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const id = searchParams.get("id");
+    // PayPhone puede enviar 'clientTransactionId' o 'clientTxId' dependiendo de la integración
+    const clientTxId = searchParams.get("clientTransactionId") || searchParams.get("clientTxId");
+
+    if (id && clientTxId) {
+      setAppState("verifying_payment");
+      verifyPayPhonePayment(id, clientTxId);
+    }
+  }, []);
+
+  const verifyPayPhonePayment = async (id: string, clientTxId: string) => {
+    try {
+      const pendingRaw = localStorage.getItem("pawphone_pending");
+      const pending = pendingRaw ? JSON.parse(pendingRaw) : null;
+
+      const res = await fetch("/api/payphone-confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id,
+          clientTransactionId: clientTxId,
+          orderData: pending
+            ? {
+                fullName: pending.orderForm.fullName,
+                email: pending.orderForm.email,
+                whatsapp: pending.orderForm.whatsapp,
+                address: pending.orderForm.address,
+                selectedVariant: pending.selectedVariantIndex,
+                tshirtColor: pending.tshirtColor,
+                tshirtSize: pending.tshirtSize,
+                shippingCost: pending.shippingCost ?? 0,
+              }
+            : {},
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Pago no aprobado");
+
+      localStorage.removeItem("pawphone_pending");
+      setOrderId(data.orderId);
+      setAppState("order_created");
+    } catch (error) {
+      setErrorMessage("Hubo un error verificando el pago con PayPhone.");
+      setAppState("order_form");
+    }
+  };
 
   const scrollTo = (ref: React.RefObject<HTMLDivElement | null>) => {
     setTimeout(() => {
@@ -83,6 +212,8 @@ export default function Home() {
         return 3;
       case "order_form":
       case "submitting_order":
+      case "awaiting_payment":
+      case "verifying_payment":
       case "order_created":
         return 4;
       default:
@@ -177,28 +308,179 @@ export default function Home() {
     scrollTo(orderSectionRef);
   };
 
+  const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+    const R = 6371; // Radio de la Tierra en km
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * (Math.PI / 180)) *
+        Math.cos(lat2 * (Math.PI / 180)) *
+        Math.sin(dLon / 2) *
+        Math.sin(dLon / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  };
+
+  const handleCalculateShipping = () => {
+    if (!navigator.geolocation) {
+      setShippingCost(3.50);
+      setShippingCalculated(true);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords;
+        const dist = calculateDistance(
+          WAREHOUSE_COORDS.lat, WAREHOUSE_COORDS.lng,
+          latitude, longitude
+        );
+        const raw = SHIPPING_BASE_RATE + dist * SHIPPING_RATE_PER_KM;
+        const withMargin = raw * 1.20; // 20% margen por clima/tráfico
+        setShippingCost(Number(Math.max(SHIPPING_MIN_RATE, withMargin).toFixed(2)));
+        setShippingCalculated(true);
+        setErrorMessage(null);
+      },
+      () => {
+        setShippingCost(3.50); // tarifa fallback si falla el GPS
+        setShippingCalculated(true);
+        setErrorMessage("No pudimos obtener tu ubicación; se aplicó tarifa estándar.");
+      },
+      { enableHighAccuracy: true }
+    );
+  };
+
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     setAppState("submitting_order");
     setErrorMessage(null);
 
+    // Lógica para Ecuador (PayPhone) — redirige al usuario a la pasarela
+    if (userCountry === "EC") {
+      if (!shippingCalculated) {
+        setAppState("order_form");
+        setErrorMessage("Por favor calcula el costo de envío antes de continuar.");
+        return;
+      }
+      try {
+        const subtotal = PRODUCT_PRICE_EC + shippingCost;
+        const payphoneAmount = Number((subtotal * (1 + PAYPHONE_COMMISSION_RATE)).toFixed(2));
+
+        const clientTransactionId = `EC-${Date.now()}-${Math.random()
+          .toString(36)
+          .substring(2, 8)
+          .toUpperCase()}`;
+
+        // Guardar datos del pedido en localStorage para recuperarlos al volver
+        localStorage.setItem(
+          "pawphone_pending",
+          JSON.stringify({
+            clientTransactionId,
+            orderForm,
+            selectedVariantIndex,
+            tshirtColor: selectedColor.name,
+            tshirtSize: selectedSize,
+            shippingCost,
+          })
+        );
+
+        const res = await fetch("/api/payphone-payment", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...orderForm, clientTransactionId, amount: payphoneAmount }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+
+        window.location.href = data.paymentUrl;
+      } catch (err) {
+        setAppState("order_form");
+        setErrorMessage(
+          err instanceof Error ? err.message : "Error iniciando PayPhone"
+        );
+      }
+      return;
+    }
+
+    // Lógica para Colombia (Wompi)
     try {
-      const response = await fetch("/api/order", {
+      if (!wompiReady) {
+        throw new Error("El módulo de pago aún no está listo. Intenta en unos segundos.");
+      }
+
+      // 1. Obtener referencia y firma desde el backend
+      const sessionRes = await fetch("/api/wompi-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...orderForm,
-          selectedVariant: selectedVariantIndex,
-          tshirtColor: selectedColor.name,
-          tshirtSize: selectedSize,
-        }),
+        body: JSON.stringify(orderForm),
+      });
+      const sessionData = await sessionRes.json();
+      if (!sessionRes.ok) throw new Error(sessionData.error);
+
+      // 2. Abrir el widget de Wompi (modal inline, sin salir del sitio)
+      setAppState("awaiting_payment");
+
+      const checkout = new window.WidgetCheckout({
+        currency: sessionData.currency,
+        amountInCents: sessionData.amountInCents,
+        reference: sessionData.reference,
+        publicKey: sessionData.publicKey,
+        signature: { integrity: sessionData.signature },
+        customerData: {
+          email: orderForm.email,
+          fullName: orderForm.fullName,
+          phoneNumber: orderForm.whatsapp.replace(/\D/g, ""),
+          phoneNumberPrefix: "+57",
+        },
       });
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error);
+      checkout.open((result) => {
+        void (async () => {
+          const transaction = result?.transaction;
 
-      setOrderId(data.orderId);
-      setAppState("order_created");
+          // Pago no completado o rechazado
+          if (
+            !transaction ||
+            transaction.status === "DECLINED" ||
+            transaction.status === "ERROR" ||
+            transaction.status === "VOIDED"
+          ) {
+            setAppState("order_form");
+            setErrorMessage(
+              "El pago no fue completado. Por favor intenta nuevamente."
+            );
+            return;
+          }
+
+          // 3. Pago aprobado o pendiente → guardar el pedido
+          try {
+            const orderRes = await fetch("/api/order", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                ...orderForm,
+                selectedVariant: selectedVariantIndex,
+                tshirtColor: selectedColor.name,
+                tshirtSize: selectedSize,
+                wompiReference: sessionData.reference,
+                wompiTransactionId: transaction.id,
+                wompiStatus: transaction.status,
+              }),
+            });
+            const orderData = await orderRes.json();
+            if (!orderRes.ok) throw new Error(orderData.error);
+
+            setOrderId(orderData.orderId);
+            setAppState("order_created");
+          } catch (saveErr) {
+            setAppState("order_form");
+            setErrorMessage(
+              saveErr instanceof Error
+                ? saveErr.message
+                : "Error guardando el pedido"
+            );
+          }
+        })();
+      });
     } catch (err) {
       setAppState("order_form");
       setErrorMessage(
@@ -210,6 +492,11 @@ export default function Home() {
   const currentStep = getCurrentStep();
   const selectedArt =
     selectedVariantIndex !== null ? artVariants[selectedVariantIndex] : null;
+
+  // Totales Ecuador
+  const subtotalEC = PRODUCT_PRICE_EC + shippingCost;
+  const payphoneTotalEC = Number((subtotalEC * (1 + PAYPHONE_COMMISSION_RATE)).toFixed(2));
+  const payphoneCommissionEC = Number((subtotalEC * PAYPHONE_COMMISSION_RATE).toFixed(2));
 
   return (
     <div className="min-h-screen bg-background-light">
@@ -315,17 +602,38 @@ export default function Home() {
               >
                 Crear mi diseño ahora
               </button>
-              <div className="flex items-center gap-3 px-4">
+              <div className="flex flex-col items-start gap-2 px-4">
                 <div className="flex -space-x-2">
-                  <div className="w-10 h-10 rounded-full border-2 border-white bg-primary/20 flex items-center justify-center text-primary text-xs font-bold">
-                    J
-                  </div>
-                  <div className="w-10 h-10 rounded-full border-2 border-white bg-primary/30 flex items-center justify-center text-primary text-xs font-bold">
-                    E
-                  </div>
-                  <div className="w-10 h-10 rounded-full border-2 border-white bg-primary/40 flex items-center justify-center text-white text-xs font-bold">
-                    C
-                  </div>
+                  <img
+                    src="https://i.pravatar.cc/40?img=47"
+                    alt="Cliente feliz"
+                    className="w-10 h-10 rounded-full border-2 border-white object-cover"
+                  />
+                  <img
+                    src="https://i.pravatar.cc/40?img=12"
+                    alt="Cliente feliz"
+                    className="w-10 h-10 rounded-full border-2 border-white object-cover"
+                  />
+                  <img
+                    src="https://i.pravatar.cc/40?img=33"
+                    alt="Cliente feliz"
+                    className="w-10 h-10 rounded-full border-2 border-white object-cover"
+                  />
+                  <img
+                    src="https://i.pravatar.cc/40?img=5"
+                    alt="Cliente feliz"
+                    className="w-10 h-10 rounded-full border-2 border-white object-cover"
+                  />
+                  <img
+                    src="https://i.pravatar.cc/40?img=21"
+                    alt="Cliente feliz"
+                    className="w-10 h-10 rounded-full border-2 border-white object-cover"
+                  />
+                  <img
+                    src="https://i.pravatar.cc/40?img=56"
+                    alt="Cliente feliz"
+                    className="w-10 h-10 rounded-full border-2 border-white object-cover"
+                  />
                 </div>
                 <p className="text-sm font-medium text-slate-500">
                   Más de 2k dueños felices
@@ -335,14 +643,12 @@ export default function Home() {
           </div>
           <div className="relative">
             <div className="absolute -inset-4 bg-primary/10 rounded-full blur-3xl"></div>
-            <div className="relative rounded-2xl overflow-hidden shadow-2xl rotate-2 hover:rotate-0 transition-transform duration-500 bg-gradient-to-br from-primary/20 to-primary/5 aspect-square flex items-center justify-center">
-              <div className="text-center p-8">
-                <span className="material-symbols-outlined text-primary" style={{ fontSize: "120px" }}>
-                  palette
-                </span>
-                <p className="text-2xl font-bold text-primary mt-4">Tu mascota, tu arte</p>
-                <p className="text-slate-500 mt-2">Powered by AI</p>
-              </div>
+            <div className="relative rounded-2xl overflow-hidden shadow-2xl rotate-2 hover:rotate-0 transition-transform duration-500 aspect-square">
+              <img
+                src="/model.jpg"
+                alt="Modelo con camiseta personalizada PawArt Studio"
+                className="w-full h-full object-cover"
+              />
             </div>
           </div>
         </section>
@@ -365,21 +671,25 @@ export default function Home() {
               {[
                 {
                   icon: "cloud_upload",
+                  customIcon: <UploadDogIcon />,
                   title: "Sube tu foto",
                   desc: "Carga una imagen clara de tu fiel compañero.",
                 },
                 {
                   icon: "auto_awesome",
+                  customIcon: <AiVersionsIcon />,
                   title: "3 Versiones IA",
                   desc: "Nuestra IA genera 3 estilos artísticos únicos para ti.",
                 },
                 {
                   icon: "checkroom",
+                  customIcon: <TshirtSelectorIcon />,
                   title: "Elige tu camiseta",
                   desc: "Selecciona el color y la talla ideal para lucirlo.",
                 },
                 {
                   icon: "local_shipping",
+                  customIcon: <DeliveryIcon />,
                   title: "Recibe en casa",
                   desc: "Envío rápido directamente a tu puerta.",
                 },
@@ -388,11 +698,17 @@ export default function Home() {
                   key={item.icon}
                   className="flex flex-col items-center text-center group"
                 >
-                  <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                    <span className="material-symbols-outlined text-3xl">
-                      {item.icon}
-                    </span>
-                  </div>
+                  {"customIcon" in item && item.customIcon ? (
+                    <div className="w-32 h-32 mb-6 group-hover:scale-110 transition-transform drop-shadow-sm">
+                      {item.customIcon}
+                    </div>
+                  ) : (
+                    <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                      <span className="material-symbols-outlined text-3xl">
+                        {item.icon}
+                      </span>
+                    </div>
+                  )}
                   <h3 className="font-bold mb-2">{item.title}</h3>
                   <p className="text-sm text-slate-500">{item.desc}</p>
                 </div>
@@ -413,23 +729,46 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Photo tips */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-8">
-              <div className="flex items-start gap-2 bg-green-50 border border-green-100 rounded-xl p-3">
-                <span className="material-symbols-outlined text-green-500 text-lg mt-0.5">check_circle</span>
-                <p className="text-xs text-green-700"><span className="font-bold">Buena luz</span> — natural, sin flash directo</p>
+            {/* Photo tips — 2×2 grid */}
+            <div className="grid grid-cols-2 gap-4 mb-8">
+              {/* ✓ Buena luz */}
+              <div className="group flex flex-col items-center text-center gap-3 bg-green-50 border border-green-100 rounded-2xl p-4 hover:border-green-300 hover:shadow-md transition-all cursor-default">
+                <div className="w-24 h-24 group-hover:scale-110 transition-transform duration-300">
+                  <GoodLightingIcon />
+                </div>
+                <p className="text-xs text-green-700 leading-relaxed">
+                  <span className="font-bold">Buena luz</span><br/>natural, sin flash directo
+                </p>
               </div>
-              <div className="flex items-start gap-2 bg-green-50 border border-green-100 rounded-xl p-3">
-                <span className="material-symbols-outlined text-green-500 text-lg mt-0.5">check_circle</span>
-                <p className="text-xs text-green-700"><span className="font-bold">Cara visible</span> — que se vean bien los ojos y rasgos</p>
+
+              {/* ✓ Cara visible */}
+              <div className="group flex flex-col items-center text-center gap-3 bg-green-50 border border-green-100 rounded-2xl p-4 hover:border-green-300 hover:shadow-md transition-all cursor-default">
+                <div className="w-24 h-24 group-hover:scale-110 transition-transform duration-300">
+                  <ClearFaceIcon />
+                </div>
+                <p className="text-xs text-green-700 leading-relaxed">
+                  <span className="font-bold">Cara visible</span><br/>ojos y rasgos bien definidos
+                </p>
               </div>
-              <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl p-3">
-                <span className="material-symbols-outlined text-red-400 text-lg mt-0.5">cancel</span>
-                <p className="text-xs text-red-600"><span className="font-bold">Evita borrosas</span> — sin movimiento ni desenfoque</p>
+
+              {/* ✗ Evita borrosas */}
+              <div className="group flex flex-col items-center text-center gap-3 bg-red-50 border border-red-100 rounded-2xl p-4 hover:border-red-300 hover:shadow-md transition-all cursor-default">
+                <div className="w-24 h-24 group-hover:scale-110 transition-transform duration-300">
+                  <AvoidBlurIcon />
+                </div>
+                <p className="text-xs text-red-600 leading-relaxed">
+                  <span className="font-bold">Evita borrosas</span><br/>sin movimiento ni desenfoque
+                </p>
               </div>
-              <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl p-3">
-                <span className="material-symbols-outlined text-red-400 text-lg mt-0.5">cancel</span>
-                <p className="text-xs text-red-600"><span className="font-bold">Evita lejos</span> — que la mascota ocupe la mayor parte de la foto</p>
+
+              {/* ✗ Evita lejos */}
+              <div className="group flex flex-col items-center text-center gap-3 bg-red-50 border border-red-100 rounded-2xl p-4 hover:border-red-300 hover:shadow-md transition-all cursor-default">
+                <div className="w-24 h-24 group-hover:scale-110 transition-transform duration-300">
+                  <AvoidFarIcon />
+                </div>
+                <p className="text-xs text-red-600 leading-relaxed">
+                  <span className="font-bold">Evita lejos</span><br/>la mascota debe llenar la foto
+                </p>
               </div>
             </div>
 
@@ -766,12 +1105,35 @@ export default function Home() {
         {/* Order Form */}
         {(appState === "order_form" ||
           appState === "submitting_order" ||
+          appState === "awaiting_payment" ||
+          appState === "verifying_payment" ||
           appState === "order_created") && (
           <section
             ref={orderSectionRef}
             className="max-w-4xl mx-auto px-4 py-24"
           >
-            {appState === "order_created" ? (
+            {appState === "awaiting_payment" ? (
+              <div className="bg-white rounded-3xl p-10 shadow-2xl border border-slate-100 text-center">
+                <div className="w-20 h-20 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-6">
+                  <div className="w-10 h-10 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+                </div>
+                <h2 className="text-2xl font-bold mb-3">Procesando tu pago</h2>
+                <p className="text-slate-500">
+                  Completa el pago en la ventana de Wompi que apareció. No cierres esta página.
+                </p>
+              </div>
+            ) : appState === "verifying_payment" ? (
+              <div className="bg-white rounded-3xl p-10 shadow-2xl border border-slate-100 text-center">
+                <div className="w-20 h-20 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-6">
+                  <div className="w-10 h-10 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
+                </div>
+                <h2 className="text-2xl font-bold mb-3">Verificando pago...</h2>
+                <p className="text-slate-500">
+                  Estamos confirmando la transacción con PayPhone.
+                  <br />Por favor espera un momento.
+                </p>
+              </div>
+            ) : appState === "order_created" ? (
               <div className="bg-white rounded-3xl p-10 shadow-2xl border border-slate-100 text-center">
                 <div className="w-20 h-20 rounded-full bg-green-100 text-green-500 flex items-center justify-center mx-auto mb-6">
                   <span className="material-symbols-outlined text-5xl">
@@ -895,6 +1257,24 @@ export default function Home() {
                     <label className="text-sm font-bold">
                       Dirección de Envío
                     </label>
+                    {userCountry === "EC" && (
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        <button
+                          type="button"
+                          onClick={handleCalculateShipping}
+                          className="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg font-bold hover:bg-blue-200 transition-colors flex items-center gap-1"
+                        >
+                          <span className="material-symbols-outlined text-sm">my_location</span>
+                          Calcular envío con mi ubicación
+                        </button>
+                        {shippingCalculated && (
+                          <span className="text-xs bg-green-100 text-green-700 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1">
+                            <span className="material-symbols-outlined text-sm">local_shipping</span>
+                            Envío: ${shippingCost.toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+                    )}
                     <textarea
                       required
                       value={orderForm.address}
@@ -909,6 +1289,89 @@ export default function Home() {
                       rows={3}
                     />
                   </div>
+
+                  {/* Resumen de pago — Ecuador */}
+                  {userCountry === "EC" ? (
+                    <div className="pt-6 border-t border-slate-100 mt-10 space-y-6">
+                      {/* Desglose de precio */}
+                      <div className="bg-slate-50 rounded-2xl p-5 space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Camiseta personalizada</span>
+                          <span className="font-semibold">${PRODUCT_PRICE_EC.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Envío estimado</span>
+                          <span className="font-semibold">
+                            {shippingCalculated ? `$${shippingCost.toFixed(2)}` : "—"}
+                          </span>
+                        </div>
+                        <div className="border-t border-slate-200 pt-2 flex justify-between font-bold text-base">
+                          <span>Subtotal</span>
+                          <span>{shippingCalculated ? `$${subtotalEC.toFixed(2)} USD` : "—"}</span>
+                        </div>
+                      </div>
+
+                      {/* Opción 1: PayPhone */}
+                      <div className="border border-slate-200 rounded-2xl p-5 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="font-bold text-sm">Pagar con PayPhone</p>
+                          <span className="text-xs bg-amber-100 text-amber-700 px-2 py-1 rounded-full font-semibold">
+                            +5% comisión
+                          </span>
+                        </div>
+                        {shippingCalculated && (
+                          <div className="flex justify-between text-xs text-slate-500">
+                            <span>Comisión PayPhone</span>
+                            <span>+${payphoneCommissionEC.toFixed(2)}</span>
+                          </div>
+                        )}
+                        <p className="text-3xl font-black text-primary">
+                          {shippingCalculated ? `$${payphoneTotalEC.toFixed(2)} USD` : "—"}
+                        </p>
+                        <button
+                          type="submit"
+                          disabled={appState === "submitting_order" || !shippingCalculated}
+                          className={`w-full py-4 rounded-xl font-bold text-lg shadow-lg transition-opacity ${
+                            appState === "submitting_order" || !shippingCalculated
+                              ? "bg-slate-300 text-slate-500 cursor-not-allowed"
+                              : "bg-primary text-white hover:opacity-90"
+                          }`}
+                        >
+                          {appState === "submitting_order"
+                            ? "Preparando pago..."
+                            : "Ir a pagar con PayPhone"}
+                        </button>
+                      </div>
+
+                      {/* Opción 2: Transferencia bancaria */}
+                      <div className="border border-green-200 bg-green-50 rounded-2xl p-5 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="font-bold text-sm text-green-800">Transferencia bancaria</p>
+                          <span className="text-xs bg-green-200 text-green-800 px-2 py-1 rounded-full font-semibold">
+                            Sin comisión
+                          </span>
+                        </div>
+                        <p className="text-3xl font-black text-green-700">
+                          {shippingCalculated ? `$${subtotalEC.toFixed(2)} USD` : "—"}
+                        </p>
+                        <p className="text-xs text-green-700">
+                          Aceptamos todos los bancos de Ecuador. Solicita los datos de cuenta por WhatsApp.
+                        </p>
+                        <a
+                          href="https://wa.me/yourphonenumber"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center justify-center gap-2 w-full py-4 rounded-xl font-bold text-lg bg-[#25D366] text-white hover:opacity-90 transition-opacity"
+                        >
+                          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.767 5.77 0 1.265.407 2.457 1.157 3.44l-1.157 3.39 3.51-1.152c.928.608 2.016.959 3.19.959 3.18 0 5.766-2.585 5.766-5.77 0-3.185-2.586-5.77-5.766-5.77zm4.211 8.24c-.171.482-.98.88-1.341.93-.362.05-.733.09-2.316-.54-1.583-.63-2.583-2.22-2.664-2.33-.081-.11-.663-.88-.663-1.69 0-.81.41-1.21.56-1.37.15-.16.33-.2.44-.2s.22-.01.32-.01c.1 0 .24-.04.37.27.14.33.47 1.15.51 1.24.04.09.06.19 0 .32-.06.13-.09.22-.19.33-.09.11-.2.25-.29.33-.1.09-.2.19-.08.38.11.19.51.84 1.1 1.37.76.68 1.4.89 1.6.99s.32.07.45-.08c.13-.15.54-.63.68-.84.15-.21.29-.18.49-.1s1.31.62 1.54.73c.23.11.38.17.44.27.05.11.05.62-.12 1.1z" />
+                          </svg>
+                          Solicitar datos por WhatsApp
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                  /* Resumen de pago — Colombia */
                   <div className="pt-6 border-t border-slate-100 mt-10">
                     <div className="flex justify-between items-center mb-8">
                       <div>
@@ -918,23 +1381,26 @@ export default function Home() {
                         </p>
                       </div>
                       <p className="text-3xl font-black text-primary">
-                        39.90&euro;
+                        $89.900 COP
                       </p>
                     </div>
                     <button
                       type="submit"
-                      disabled={appState === "submitting_order"}
+                      disabled={appState === "submitting_order" || !wompiReady}
                       className={`w-full py-5 rounded-2xl font-bold text-xl shadow-xl transition-opacity ${
-                        appState === "submitting_order"
+                        appState === "submitting_order" || !wompiReady
                           ? "bg-slate-300 text-slate-500 cursor-not-allowed"
                           : "bg-primary text-white hover:opacity-90"
                       }`}
                     >
                       {appState === "submitting_order"
-                        ? "Procesando..."
-                        : "Solicitar mi camiseta personalizada"}
+                        ? "Preparando pago..."
+                        : !wompiReady
+                        ? "Cargando módulo de pago..."
+                        : "Ir a pagar con Wompi"}
                     </button>
                   </div>
+                  )}
                 </form>
               </div>
             )}

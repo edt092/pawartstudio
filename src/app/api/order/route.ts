@@ -3,7 +3,18 @@ import { NextRequest, NextResponse } from "next/server";
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { fullName, email, whatsapp, address, selectedVariant, tshirtColor, tshirtSize } = body;
+    const {
+      fullName,
+      email,
+      whatsapp,
+      address,
+      selectedVariant,
+      tshirtColor,
+      tshirtSize,
+      wompiReference,
+      wompiTransactionId,
+      wompiStatus,
+    } = body;
 
     if (!fullName || !email || !whatsapp || !address) {
       return NextResponse.json(
@@ -29,7 +40,12 @@ export async function POST(request: NextRequest) {
       selectedVariant,
       tshirtColor,
       tshirtSize,
-      status: "pending_contact",
+      payment: {
+        wompiReference: wompiReference ?? null,
+        wompiTransactionId: wompiTransactionId ?? null,
+        wompiStatus: wompiStatus ?? null,
+      },
+      status: wompiStatus === "APPROVED" ? "paid" : "pending_payment",
       createdAt: new Date().toISOString(),
     };
 
