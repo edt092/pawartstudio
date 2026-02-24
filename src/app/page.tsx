@@ -84,6 +84,13 @@ const SHIPPING_RATE_PER_KM = 0.35; // USD por km
 const SHIPPING_MIN_RATE = 2.50; // mínimo USD
 const PAYPHONE_COMMISSION_RATE = 0.05; // 5%
 
+// Configuración de envíos Colombia — Bodega: Bogotá
+const WAREHOUSE_COORDS_CO = { lat: 4.7110, lng: -74.0721 };
+const PRODUCT_PRICE_CO = 38000; // COP
+const SHIPPING_BASE_RATE_CO = 5000; // COP arranque
+const SHIPPING_RATE_PER_KM_CO = 22; // COP por km
+const SHIPPING_MIN_RATE_CO = 9000; // COP mínimo
+
 export default function Home() {
   const [appState, setAppState] = useState<AppState>("landing");
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
@@ -326,8 +333,15 @@ export default function Home() {
   };
 
   const handleCalculateShipping = () => {
+    const isEC = userCountry === "EC";
+    const warehouseCoords = isEC ? WAREHOUSE_COORDS : WAREHOUSE_COORDS_CO;
+    const baseRate = isEC ? SHIPPING_BASE_RATE : SHIPPING_BASE_RATE_CO;
+    const ratePerKm = isEC ? SHIPPING_RATE_PER_KM : SHIPPING_RATE_PER_KM_CO;
+    const minRate = isEC ? SHIPPING_MIN_RATE : SHIPPING_MIN_RATE_CO;
+    const fallback = isEC ? 3.50 : 12000;
+
     if (!navigator.geolocation) {
-      setShippingCost(3.50);
+      setShippingCost(fallback);
       setShippingCalculated(true);
       return;
     }
@@ -335,17 +349,20 @@ export default function Home() {
       (position) => {
         const { latitude, longitude } = position.coords;
         const dist = calculateDistance(
-          WAREHOUSE_COORDS.lat, WAREHOUSE_COORDS.lng,
+          warehouseCoords.lat, warehouseCoords.lng,
           latitude, longitude
         );
-        const raw = SHIPPING_BASE_RATE + dist * SHIPPING_RATE_PER_KM;
+        const raw = baseRate + dist * ratePerKm;
         const withMargin = raw * 1.20; // 20% margen por clima/tráfico
-        setShippingCost(Number(Math.max(SHIPPING_MIN_RATE, withMargin).toFixed(2)));
+        const rounded = isEC
+          ? Number(Math.max(minRate, withMargin).toFixed(2))
+          : Math.round(Math.max(minRate, withMargin) / 500) * 500; // redondeo a 500 COP
+        setShippingCost(rounded);
         setShippingCalculated(true);
         setErrorMessage(null);
       },
       () => {
-        setShippingCost(3.50); // tarifa fallback si falla el GPS
+        setShippingCost(fallback);
         setShippingCalculated(true);
         setErrorMessage("No pudimos obtener tu ubicación; se aplicó tarifa estándar.");
       },
@@ -406,16 +423,24 @@ export default function Home() {
     }
 
     // Lógica para Colombia (Wompi)
+    if (!shippingCalculated) {
+      setAppState("order_form");
+      setErrorMessage("Por favor calcula el costo de envío antes de continuar.");
+      return;
+    }
+
     try {
       if (!wompiReady) {
         throw new Error("El módulo de pago aún no está listo. Intenta en unos segundos.");
       }
 
+      const totalCO = PRODUCT_PRICE_CO + shippingCost;
+
       // 1. Obtener referencia y firma desde el backend
       const sessionRes = await fetch("/api/wompi-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(orderForm),
+        body: JSON.stringify({ ...orderForm, totalCOP: totalCO }),
       });
       const sessionData = await sessionRes.json();
       if (!sessionRes.ok) throw new Error(sessionData.error);
@@ -501,6 +526,11 @@ export default function Home() {
   const subtotalEC = PRODUCT_PRICE_EC + shippingCost;
   const payphoneTotalEC = Number((subtotalEC * (1 + PAYPHONE_COMMISSION_RATE)).toFixed(2));
   const payphoneCommissionEC = Number((subtotalEC * PAYPHONE_COMMISSION_RATE).toFixed(2));
+
+  // Totales Colombia
+  const subtotalCO = PRODUCT_PRICE_CO + shippingCost;
+  const formatCOP = (n: number) =>
+    new Intl.NumberFormat("es-CO", { style: "currency", currency: "COP", maximumFractionDigits: 0 }).format(n);
 
   return (
     <div className="min-h-screen bg-background-light">
@@ -1261,24 +1291,24 @@ export default function Home() {
                     <label className="text-sm font-bold">
                       Dirección de Envío
                     </label>
-                    {userCountry === "EC" && (
-                      <div className="flex flex-wrap gap-2 mb-2">
-                        <button
-                          type="button"
-                          onClick={handleCalculateShipping}
-                          className="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg font-bold hover:bg-blue-200 transition-colors flex items-center gap-1"
-                        >
-                          <span className="material-symbols-outlined text-sm">my_location</span>
-                          Calcular envío con mi ubicación
-                        </button>
-                        {shippingCalculated && (
-                          <span className="text-xs bg-green-100 text-green-700 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1">
-                            <span className="material-symbols-outlined text-sm">local_shipping</span>
-                            Envío: ${shippingCost.toFixed(2)}
-                          </span>
-                        )}
-                      </div>
-                    )}
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      <button
+                        type="button"
+                        onClick={handleCalculateShipping}
+                        className="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded-lg font-bold hover:bg-blue-200 transition-colors flex items-center gap-1"
+                      >
+                        <span className="material-symbols-outlined text-sm">my_location</span>
+                        Calcular envío con mi ubicación
+                      </button>
+                      {shippingCalculated && (
+                        <span className="text-xs bg-green-100 text-green-700 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1">
+                          <span className="material-symbols-outlined text-sm">local_shipping</span>
+                          {userCountry === "EC"
+                            ? `Envío: $${shippingCost.toFixed(2)}`
+                            : `Envío: ${formatCOP(shippingCost)}`}
+                        </span>
+                      )}
+                    </div>
                     <textarea
                       required
                       value={orderForm.address}
@@ -1376,23 +1406,30 @@ export default function Home() {
                     </div>
                   ) : (
                   /* Resumen de pago — Colombia */
-                  <div className="pt-6 border-t border-slate-100 mt-10">
-                    <div className="flex justify-between items-center mb-8">
-                      <div>
-                        <p className="text-lg font-bold">Total</p>
-                        <p className="text-sm text-slate-500">
-                          Incluye personalización y envío
-                        </p>
+                  <div className="pt-6 border-t border-slate-100 mt-10 space-y-6">
+                    {/* Desglose de precio */}
+                    <div className="bg-slate-50 rounded-2xl p-5 space-y-2 text-sm">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Camiseta personalizada</span>
+                        <span className="font-semibold">{formatCOP(PRODUCT_PRICE_CO)}</span>
                       </div>
-                      <p className="text-3xl font-black text-primary">
-                        $89.900 COP
-                      </p>
+                      <div className="flex justify-between">
+                        <span className="text-slate-500">Envío estimado</span>
+                        <span className="font-semibold">
+                          {shippingCalculated ? formatCOP(shippingCost) : "—"}
+                        </span>
+                      </div>
+                      <div className="border-t border-slate-200 pt-2 flex justify-between font-bold text-base">
+                        <span>Total</span>
+                        <span>{shippingCalculated ? formatCOP(subtotalCO) : "—"}</span>
+                      </div>
                     </div>
+
                     <button
                       type="submit"
-                      disabled={appState === "submitting_order" || !wompiReady}
+                      disabled={appState === "submitting_order" || !wompiReady || !shippingCalculated}
                       className={`w-full py-5 rounded-2xl font-bold text-xl shadow-xl transition-opacity ${
-                        appState === "submitting_order" || !wompiReady
+                        appState === "submitting_order" || !wompiReady || !shippingCalculated
                           ? "bg-slate-300 text-slate-500 cursor-not-allowed"
                           : "bg-primary text-white hover:opacity-90"
                       }`}
@@ -1401,7 +1438,9 @@ export default function Home() {
                         ? "Preparando pago..."
                         : !wompiReady
                         ? "Cargando módulo de pago..."
-                        : "Ir a pagar con Wompi"}
+                        : !shippingCalculated
+                        ? "Calcula el envío para continuar"
+                        : `Pagar ${formatCOP(subtotalCO)} con Wompi`}
                     </button>
                   </div>
                   )}
