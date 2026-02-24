@@ -98,10 +98,11 @@ function Tshirt({ processedImageUrl, color }: TshirtProps) {
           metalness={0}
           side={THREE.DoubleSide}
         />
+        {/* Área de impresión centrada en el pecho — ajustado al mesh */}
         <Decal
-          position={[0, 0.04, 0.15]}
+          position={[0, 0.04, 0.11]}
           rotation={[0, 0, 0]}
-          scale={0.38}
+          scale={[0.22, 0.26, 0.20]}
           depthTest={false}
         >
           <meshStandardMaterial
