@@ -72,6 +72,10 @@ const TSHIRT_COLORS = [
 
 const TSHIRT_SIZES = ["S", "M", "L", "XL", "XXL"];
 
+// Dimensiones físicas de impresión en cm (Ancho x Alto) — relación 1:1.4
+// En Three.js/GLB (metros), 30cm = 0.30 u, 42cm = 0.42 u
+const PRINT_SIZE_CM = { width: 30, height: 42 };
+
 // Configuración de envíos Ecuador — Bodega: 0°06'03.2"S 78°27'38.1"W
 const WAREHOUSE_COORDS = { lat: -0.100889, lng: -78.460583 };
 const PRODUCT_PRICE_EC = 24.99; // USD
@@ -1414,9 +1418,13 @@ export default function Home() {
               <h2 className="text-3xl font-bold mb-4">
                 Lo que dicen los amantes de mascotas
               </h2>
-              <div className="flex justify-center gap-1 text-primary">
+              <div className="flex justify-center gap-1 text-yellow-400">
                 {[...Array(5)].map((_, i) => (
-                  <span key={i} className="material-symbols-outlined">
+                  <span
+                    key={i}
+                    className="material-symbols-outlined"
+                    style={{ fontVariationSettings: "'FILL' 1" }}
+                  >
                     star
                   </span>
                 ))}
@@ -1428,19 +1436,19 @@ export default function Home() {
                   name: "Marcos R.",
                   pet: "Dueño de Max (Labrador)",
                   text: '"La calidad de la impresión es increíble. Parece una pintura real sobre la tela. ¡Me encanta!"',
-                  initial: "M",
+                  avatar: "https://i.pravatar.cc/48?img=11",
                 },
                 {
                   name: "Elena G.",
                   pet: "Dueña de Luna (Siamés)",
                   text: '"El proceso fue super rápido. La IA captó perfectamente la esencia de mi gatita. Compraré otra para regalo."',
-                  initial: "E",
+                  avatar: "https://i.pravatar.cc/48?img=47",
                 },
                 {
                   name: "Carlos M.",
                   pet: "Dueño de Toby (Beagle)",
                   text: '"No esperaba que el envío fuera tan veloz. La camiseta es muy cómoda y el diseño se ve genial."',
-                  initial: "C",
+                  avatar: "https://i.pravatar.cc/48?img=33",
                 },
               ].map((t) => (
                 <div
@@ -1448,13 +1456,26 @@ export default function Home() {
                   className="bg-white p-8 rounded-2xl shadow-sm border border-slate-50"
                 >
                   <div className="flex items-center gap-4 mb-6">
-                    <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">
-                      {t.initial}
-                    </div>
+                    <img
+                      src={t.avatar}
+                      alt={t.name}
+                      className="w-12 h-12 rounded-full object-cover"
+                    />
                     <div>
                       <p className="font-bold">{t.name}</p>
                       <p className="text-xs text-slate-400">{t.pet}</p>
                     </div>
+                  </div>
+                  <div className="flex gap-0.5 mb-3">
+                    {[...Array(5)].map((_, i) => (
+                      <span
+                        key={i}
+                        className="material-symbols-outlined text-yellow-400 text-xl"
+                        style={{ fontVariationSettings: "'FILL' 1" }}
+                      >
+                        star
+                      </span>
+                    ))}
                   </div>
                   <p className="text-slate-600 italic">{t.text}</p>
                 </div>
