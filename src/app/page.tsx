@@ -546,13 +546,12 @@ export default function Home() {
       <header className="sticky top-0 z-50 bg-background-light/80 backdrop-blur-md border-b border-primary/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
-            <div className="flex items-center gap-2">
-              <div className="bg-primary p-2 rounded-lg text-white">
-                <span className="material-symbols-outlined">pets</span>
-              </div>
-              <span className="text-xl font-extrabold tracking-tight">
-                PawArt Studio
-              </span>
+            <div className="flex items-center">
+              <img
+                src="/paw-art-studio-logo.png"
+                alt="PawArt Studio"
+                className="h-14 w-auto object-contain"
+              />
             </div>
             <nav className="hidden md:flex space-x-8 items-center">
               <a
