@@ -1,11 +1,7 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { NextRequest, NextResponse } from "next/server";
 
-// Vercel: aumenta el timeout a 60s (máx en Hobby) o 300s en Pro
-// La generación de 3 imágenes en paralelo puede tardar 20-40s
-export const maxDuration = 60;
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const genAI = new GoogleGenerativeAI(process.env.PawArtStudioKey!);
 
 const NEGATIVE_PROMPT =
   "Do NOT include any human, person, man, woman, child. Do NOT add text, watermarks, signatures, or logos. Do NOT distort the animal's anatomy. Do NOT change the species of the animal.";
