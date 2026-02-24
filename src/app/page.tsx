@@ -84,8 +84,8 @@ const SHIPPING_RATE_PER_KM = 0.35; // USD por km
 const SHIPPING_MIN_RATE = 2.50; // mínimo USD
 const PAYPHONE_COMMISSION_RATE = 0.05; // 5%
 
-// Configuración de envíos Colombia — Bodega: Bogotá
-const WAREHOUSE_COORDS_CO = { lat: 4.7110, lng: -74.0721 };
+// Configuración de envíos Colombia — Bodega: 7°06'08.8"N 73°06'43.5"W (Bucaramanga, Santander)
+const WAREHOUSE_COORDS_CO = { lat: 7.1024, lng: -73.1121 };
 const PRODUCT_PRICE_CO = 38000; // COP
 const SHIPPING_BASE_RATE_CO = 5000; // COP arranque
 const SHIPPING_RATE_PER_KM_CO = 22; // COP por km
