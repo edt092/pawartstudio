@@ -496,7 +496,7 @@ export default function Home() {
         clientTransactionId,
         amount: amountInCents,
         email: orderForm.email,
-        phoneNumber: `+593${orderForm.whatsapp.replace(/\s/g, "")}`,
+        phoneNumber: `+593${orderForm.whatsapp.replace(/\s/g, "").replace(/^0/, "")}`,
       });
       setAppState("payphone_widget");
       return;
