@@ -257,25 +257,30 @@ export default function Home() {
   useEffect(() => {
     if (appState !== "payphone_widget" || !payphoneReady || !payphoneConfig) return;
 
-    const token = process.env.NEXT_PUBLIC_PAYPHONE_TOKEN;
-    const storeId = process.env.NEXT_PUBLIC_PAYPHONE_STORE_ID;
-    if (!token) return;
-
-    new window.PPaymentButtonBox({
-      token,
-      storeId,
-      clientTransactionId: payphoneConfig.clientTransactionId,
-      amount: payphoneConfig.amount,
-      amountWithoutTax: payphoneConfig.amount,
-      amountWithTax: 0,
-      tax: 0,
-      currency: "USD",
-      lang: "es",
-      defaultMethod: "card",
-      email: payphoneConfig.email,
-      phoneNumber: payphoneConfig.phoneNumber,
-      reference: payphoneConfig.clientTransactionId,
-    }).render("pp-button");
+    fetch("/api/payphone-config")
+      .then((res) => res.json())
+      .then(({ token, storeId }) => {
+        if (!token) return;
+        new window.PPaymentButtonBox({
+          token,
+          storeId,
+          clientTransactionId: payphoneConfig.clientTransactionId,
+          amount: payphoneConfig.amount,
+          amountWithoutTax: payphoneConfig.amount,
+          amountWithTax: 0,
+          tax: 0,
+          currency: "USD",
+          lang: "es",
+          defaultMethod: "card",
+          email: payphoneConfig.email,
+          phoneNumber: payphoneConfig.phoneNumber,
+          reference: payphoneConfig.clientTransactionId,
+        }).render("pp-button");
+      })
+      .catch(() => {
+        setErrorMessage("Error al inicializar el pago. Intenta de nuevo.");
+        setAppState("order_form");
+      });
   }, [appState, payphoneReady, payphoneConfig]);
 
   const scrollTo = (ref: React.RefObject<HTMLDivElement | null>) => {
