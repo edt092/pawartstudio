@@ -1,36 +1,80 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PawArtStudio
 
-## Getting Started
+Tienda online para camisetas personalizadas con arte generado por IA a partir de fotos de mascotas. Los clientes suben una foto de su mascota, generan variantes de arte con IA, eligen diseño, talla y color, y pagan directamente en el sitio.
 
-First, run the development server:
+## Características
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Generación de arte con IA (Google Gemini) a partir de fotos de mascotas
+- Vista previa 3D de la camiseta con el diseño seleccionado
+- Cálculo de envío estimado por geolocalización
+- Pagos para **Ecuador** con PayPhone (Cajita de Pagos — widget embebido)
+- Pagos para **Colombia** con Wompi
+- Opción de transferencia bancaria (Ecuador) y Nequi (Colombia)
+- Notificaciones automáticas por Telegram al confirmar cada pedido
+- Detección automática de país por IP
+
+## Stack
+
+- **Framework:** Next.js 15 (App Router)
+- **Despliegue:** Netlify
+- **IA:** Google Gemini API
+- **Pagos EC:** PayPhone (Cajita de Pagos)
+- **Pagos CO:** Wompi
+- **Notificaciones:** Telegram Bot API
+
+## Variables de entorno
+
+Crea un archivo `.env.local` con:
+
+```env
+# IA
+PawArtStudioKey=...
+
+# Wompi (Colombia)
+NEXT_PUBLIC_WOMPI_PUBLIC_KEY=...
+WOMPI_INTEGRITY_SECRET=...
+
+# PayPhone (Ecuador)
+PAYPHONE_TOKEN=...
+PAYPHONE_STORE_ID=...
+
+# Telegram (notificaciones de pedidos)
+TELEGRAM_BOT_TOKEN=...
+TELEGRAM_CHAT_ID=...
+
+# General
+NEXT_PUBLIC_BASE_URL=https://tudominio.com
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Flujo de pago Ecuador (PayPhone)
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Cliente llena formulario → click "Ir a pagar con PayPhone"
+2. Se inicializa el widget `PPaymentButtonBox` directamente en la página
+3. Cliente paga → PayPhone redirige de vuelta con `?id=&clientTransactionId=`
+4. El sitio confirma la transacción en `/api/payphone-confirm`
+5. Se envía notificación a Telegram con foto del diseño y datos del pedido
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Flujo transferencia bancaria
 
-## Learn More
+1. Cliente llena formulario → click "Solicitar datos por WhatsApp"
+2. Se envía notificación a Telegram (pedido pendiente de pago)
+3. WhatsApp se abre con mensaje prellenado con los datos del pedido
 
-To learn more about Next.js, take a look at the following resources:
+## APIs internas
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Endpoint | Descripción |
+|---|---|
+| `POST /api/generate` | Genera arte con Gemini |
+| `GET /api/payphone-config` | Devuelve token/storeId de PayPhone al cliente |
+| `POST /api/payphone-confirm` | Confirma transacción PayPhone y notifica Telegram |
+| `POST /api/transfer-request` | Registra solicitud de transferencia y notifica Telegram |
+| `POST /api/wompi-payment` | Crea referencia de pago Wompi |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Desarrollo local
 
-## Deploy on Vercel
+```bash
+npm install
+npm run dev
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Abre [http://localhost:3000](http://localhost:3000). Para simular Ecuador usa `?country=EC` en la URL, para Colombia `?country=CO`.
