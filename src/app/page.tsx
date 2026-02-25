@@ -1550,7 +1550,7 @@ export default function Home() {
                             const msg = encodeURIComponent(
                               `Hola! Quiero pagar por transferencia mi pedido de PawArtStudio.\n\nNombre: ${orderForm.fullName}\nEmail: ${orderForm.email}\nTalla: ${selectedSize} | Color: ${selectedColor.name}\nTotal: $${subtotalEC.toFixed(2)} USD\n\nPor favor envíame los datos de la cuenta.`
                             );
-                            window.open(`https://wa.me/593${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? ""}?text=${msg}`, "_blank");
+                            window.open(`https://wa.me/593979097543?text=${msg}`, "_blank");
                           }}
                           className="flex items-center justify-center gap-2 w-full py-4 rounded-xl font-bold text-lg bg-[#25D366] text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                         >
