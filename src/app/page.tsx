@@ -490,7 +490,7 @@ export default function Home() {
         clientTransactionId,
         amount: amountInCents,
         email: orderForm.email,
-        phoneNumber: orderForm.whatsapp,
+        phoneNumber: `+593${orderForm.whatsapp.replace(/\s/g, "")}`,
       });
       setAppState("payphone_widget");
       return;
@@ -1375,19 +1375,40 @@ export default function Home() {
                     <label className="text-sm font-bold">
                       WhatsApp (Para enviarte el avance)
                     </label>
-                    <input
-                      type="tel"
-                      required
-                      value={orderForm.whatsapp}
-                      onChange={(e) =>
-                        setOrderForm({
-                          ...orderForm,
-                          whatsapp: e.target.value,
-                        })
-                      }
-                      className="w-full p-4 rounded-xl border border-slate-200 bg-slate-50 focus:ring-primary focus:border-primary outline-none"
-                      placeholder="+34 600 000 000"
-                    />
+                    {userCountry === "EC" ? (
+                      <div className="flex rounded-xl border border-slate-200 bg-slate-50 overflow-hidden focus-within:ring-2 focus-within:ring-primary focus-within:border-primary">
+                        <span className="flex items-center px-4 text-sm font-bold text-slate-600 bg-slate-100 border-r border-slate-200 select-none whitespace-nowrap">
+                          +593
+                        </span>
+                        <input
+                          type="tel"
+                          required
+                          value={orderForm.whatsapp}
+                          onChange={(e) =>
+                            setOrderForm({
+                              ...orderForm,
+                              whatsapp: e.target.value.replace(/^\+?593/, ""),
+                            })
+                          }
+                          className="flex-1 p-4 bg-transparent outline-none"
+                          placeholder="99 123 4567"
+                        />
+                      </div>
+                    ) : (
+                      <input
+                        type="tel"
+                        required
+                        value={orderForm.whatsapp}
+                        onChange={(e) =>
+                          setOrderForm({
+                            ...orderForm,
+                            whatsapp: e.target.value,
+                          })
+                        }
+                        className="w-full p-4 rounded-xl border border-slate-200 bg-slate-50 focus:ring-primary focus:border-primary outline-none"
+                        placeholder="+57 300 000 0000"
+                      />
+                    )}
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-bold">
