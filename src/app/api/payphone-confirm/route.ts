@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     }
 
     const confirmRes = await fetch(
-      "https://pay.payphonetodoesposible.com/api/button/Confirm",
+      "https://pay.payphonetodoesposible.com/api/button/V2/Confirm",
       {
         method: "POST",
         headers: {

@@ -12,9 +12,26 @@ import ClearFaceIcon from "@/components/icons/ClearFaceIcon";
 import AvoidBlurIcon from "@/components/icons/AvoidBlurIcon";
 import AvoidFarIcon from "@/components/icons/AvoidFarIcon";
 
-// Declaración de tipo para el widget de Wompi
+// Declaración de tipos para widgets de pago
 declare global {
   interface Window {
+    PPaymentButtonBox: new (config: {
+      token: string;
+      clientTransactionId: string;
+      amount: number;
+      amountWithoutTax?: number;
+      amountWithTax?: number;
+      tax?: number;
+      service?: number;
+      tip?: number;
+      currency?: string;
+      storeId?: string;
+      reference?: string;
+      email?: string;
+      phoneNumber?: string;
+      lang?: string;
+      defaultMethod?: string;
+    }) => { render: (elementId: string) => void };
     WidgetCheckout: new (config: {
       currency: string;
       amountInCents: number;
@@ -46,6 +63,7 @@ type AppState =
   | "tshirt_selected"
   | "order_form"
   | "submitting_order"
+  | "payphone_widget"
   | "awaiting_payment"
   | "verifying_payment"
   | "order_created"
@@ -115,6 +133,13 @@ export default function Home() {
   const [shippingCalculated, setShippingCalculated] = useState(false);
 
   const [wompiReady, setWompiReady] = useState(false);
+  const [payphoneReady, setPayphoneReady] = useState(false);
+  const [payphoneConfig, setPayphoneConfig] = useState<{
+    clientTransactionId: string;
+    amount: number;
+    email: string;
+    phoneNumber: string;
+  } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadSectionRef = useRef<HTMLDivElement>(null);
@@ -151,6 +176,31 @@ export default function Home() {
     script.onload = () => setWompiReady(true);
     document.head.appendChild(script);
   }, []);
+
+  // Cargar assets de PayPhone (Cajita de Pagos) cuando el usuario es de Ecuador
+  useEffect(() => {
+    if (userCountry !== "EC") return;
+
+    const PP_CSS = "https://cdn.payphonetodoesposible.com/box/v1.1/payphone-payment-box.css";
+    const PP_JS = "https://cdn.payphonetodoesposible.com/box/v1.1/payphone-payment-box.js";
+
+    if (!document.querySelector(`link[href="${PP_CSS}"]`)) {
+      const link = document.createElement("link");
+      link.rel = "stylesheet";
+      link.href = PP_CSS;
+      document.head.appendChild(link);
+    }
+
+    if (document.querySelector(`script[src="${PP_JS}"]`)) {
+      setPayphoneReady(true);
+      return;
+    }
+    const script = document.createElement("script");
+    script.type = "module";
+    script.src = PP_JS;
+    script.onload = () => setPayphoneReady(true);
+    document.head.appendChild(script);
+  }, [userCountry]);
 
   // Detectar retorno de PayPhone al montar el componente
   useEffect(() => {
@@ -202,6 +252,31 @@ export default function Home() {
       setAppState("order_form");
     }
   };
+
+  // Inicializar la Cajita de Pagos de PayPhone cuando el widget está listo y la config está disponible
+  useEffect(() => {
+    if (appState !== "payphone_widget" || !payphoneReady || !payphoneConfig) return;
+
+    const token = process.env.NEXT_PUBLIC_PAYPHONE_TOKEN;
+    const storeId = process.env.NEXT_PUBLIC_PAYPHONE_STORE_ID;
+    if (!token) return;
+
+    new window.PPaymentButtonBox({
+      token,
+      storeId,
+      clientTransactionId: payphoneConfig.clientTransactionId,
+      amount: payphoneConfig.amount,
+      amountWithoutTax: payphoneConfig.amount,
+      amountWithTax: 0,
+      tax: 0,
+      currency: "USD",
+      lang: "es",
+      defaultMethod: "card",
+      email: payphoneConfig.email,
+      phoneNumber: payphoneConfig.phoneNumber,
+      reference: payphoneConfig.clientTransactionId,
+    }).render("pp-button");
+  }, [appState, payphoneReady, payphoneConfig]);
 
   const scrollTo = (ref: React.RefObject<HTMLDivElement | null>) => {
     setTimeout(() => {
@@ -375,50 +450,44 @@ export default function Home() {
     setAppState("submitting_order");
     setErrorMessage(null);
 
-    // Lógica para Ecuador (PayPhone) — redirige al usuario a la pasarela
+    // Lógica para Ecuador (PayPhone) — Cajita de Pagos (widget client-side)
     if (userCountry === "EC") {
       if (!shippingCalculated) {
         setAppState("order_form");
         setErrorMessage("Por favor calcula el costo de envío antes de continuar.");
         return;
       }
-      try {
-        const subtotal = PRODUCT_PRICE_EC + shippingCost;
-        const payphoneAmount = Number((subtotal * (1 + PAYPHONE_COMMISSION_RATE)).toFixed(2));
 
-        const clientTransactionId = `EC-${Date.now()}-${Math.random()
-          .toString(36)
-          .substring(2, 8)
-          .toUpperCase()}`;
+      const subtotal = PRODUCT_PRICE_EC + shippingCost;
+      const payphoneAmount = Number((subtotal * (1 + PAYPHONE_COMMISSION_RATE)).toFixed(2));
+      const amountInCents = Math.round(payphoneAmount * 100);
 
-        // Guardar datos del pedido en localStorage para recuperarlos al volver
-        localStorage.setItem(
-          "pawphone_pending",
-          JSON.stringify({
-            clientTransactionId,
-            orderForm,
-            selectedVariantIndex,
-            tshirtColor: selectedColor.name,
-            tshirtSize: selectedSize,
-            shippingCost,
-          })
-        );
+      // clientTransactionId solo alfanumérico, máx 20 chars (requerido por PayPhone)
+      const clientTransactionId = `EC${Date.now()}${Math.random()
+        .toString(36)
+        .substring(2, 6)
+        .toUpperCase()}`.slice(0, 20);
 
-        const res = await fetch("/api/payphone-payment", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...orderForm, clientTransactionId, amount: payphoneAmount }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error);
+      // Guardar datos del pedido en localStorage para recuperarlos al volver
+      localStorage.setItem(
+        "pawphone_pending",
+        JSON.stringify({
+          clientTransactionId,
+          orderForm,
+          selectedVariantIndex,
+          tshirtColor: selectedColor.name,
+          tshirtSize: selectedSize,
+          shippingCost,
+        })
+      );
 
-        window.location.href = data.paymentUrl;
-      } catch (err) {
-        setAppState("order_form");
-        setErrorMessage(
-          err instanceof Error ? err.message : "Error iniciando PayPhone"
-        );
-      }
+      setPayphoneConfig({
+        clientTransactionId,
+        amount: amountInCents,
+        email: orderForm.email,
+        phoneNumber: orderForm.whatsapp,
+      });
+      setAppState("payphone_widget");
       return;
     }
 
@@ -1146,6 +1215,7 @@ export default function Home() {
         {/* Order Form */}
         {(appState === "order_form" ||
           appState === "submitting_order" ||
+          appState === "payphone_widget" ||
           appState === "awaiting_payment" ||
           appState === "verifying_payment" ||
           appState === "order_created") && (
@@ -1153,7 +1223,27 @@ export default function Home() {
             ref={orderSectionRef}
             className="max-w-4xl mx-auto px-4 py-24"
           >
-            {appState === "awaiting_payment" ? (
+            {appState === "payphone_widget" ? (
+              <div className="bg-white rounded-3xl p-10 shadow-2xl border border-slate-100">
+                <div className="text-center mb-8">
+                  <h2 className="text-2xl font-bold mb-2">Completa tu pago</h2>
+                  <p className="text-slate-500 text-sm">
+                    Paga de forma segura con PayPhone
+                  </p>
+                </div>
+                <div id="pp-button" className="min-h-[200px]" />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAppState("order_form");
+                    setErrorMessage(null);
+                  }}
+                  className="mt-6 w-full py-3 rounded-xl font-semibold text-slate-500 hover:text-slate-700 hover:bg-slate-100 transition-colors text-sm"
+                >
+                  ← Volver al formulario
+                </button>
+              </div>
+            ) : appState === "awaiting_payment" ? (
               <div className="bg-white rounded-3xl p-10 shadow-2xl border border-slate-100 text-center">
                 <div className="w-20 h-20 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-6">
                   <div className="w-10 h-10 rounded-full border-4 border-primary/20 border-t-primary animate-spin" />
