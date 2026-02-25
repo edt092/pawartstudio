@@ -13,10 +13,10 @@ export async function POST(request: NextRequest) {
     }
 
     const token = process.env.PAYPHONE_TOKEN;
-    const storeId = process.env.PAYPHONE_STORE_ID;
+    const storeIdRaw = process.env.PAYPHONE_STORE_ID;
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://pawartstudio.netlify.app";
 
-    if (!token || !storeId) {
+    if (!token || !storeIdRaw) {
       console.error("PayPhone credentials not configured");
       return NextResponse.json(
         { error: "Error de configuración del pago" },
@@ -24,8 +24,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // PayPhone espera storeId como entero
+    const storeId = parseInt(storeIdRaw, 10);
+    if (isNaN(storeId)) {
+      console.error("PAYPHONE_STORE_ID no es un número válido:", storeIdRaw);
+      return NextResponse.json(
+        { error: "Configuración de tienda inválida" },
+        { status: 500 }
+      );
+    }
+
     // PayPhone trabaja en centavos USD
     const amountInCents = Math.round(amount * 100);
+
+    // clientTransactionId solo alfanumérico, máx 20 chars
+    const shortId = clientTransactionId.replace(/[^a-zA-Z0-9]/g, "").slice(0, 20);
 
     const payphoneRes = await fetch(
       "https://pay.payphonetodoesposible.com/api/button/Prepare",
@@ -44,8 +57,8 @@ export async function POST(request: NextRequest) {
           tip: 0,
           currency: "USD",
           storeId,
-          reference: `PAWS-${clientTransactionId}`,
-          clientTransactionId,
+          reference: shortId,
+          clientTransactionId: shortId,
           responseUrl: baseUrl,
           cancellationUrl: baseUrl,
         }),
