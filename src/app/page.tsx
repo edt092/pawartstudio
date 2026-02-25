@@ -1530,14 +1530,14 @@ export default function Home() {
                               selectedVariantIndex !== null
                                 ? artVariants[selectedVariantIndex]?.image ?? null
                                 : null;
-                            // Notificar a Telegram (no bloqueante)
+                            // Notificar a Telegram
                             fetch("/api/transfer-request", {
                               method: "POST",
                               headers: { "Content-Type": "application/json" },
                               body: JSON.stringify({
                                 fullName: orderForm.fullName,
                                 email: orderForm.email,
-                                whatsapp: `+593${orderForm.whatsapp}`,
+                                whatsapp: `+593${orderForm.whatsapp.replace(/^0/, "")}`,
                                 address: orderForm.address,
                                 tshirtSize: selectedSize,
                                 tshirtColor: selectedColor.name,
@@ -1545,7 +1545,10 @@ export default function Home() {
                                 subtotal: subtotalEC.toFixed(2),
                                 variantImage: selectedImage,
                               }),
-                            }).catch(() => {});
+                            })
+                              .then((r) => r.json())
+                              .then((d) => { if (!d.success) console.error("Telegram error:", d.debug); })
+                              .catch((e) => console.error("Transfer request fetch error:", e));
                             // Abrir WhatsApp con mensaje prellenado
                             const msg = encodeURIComponent(
                               `Hola! Quiero pagar por transferencia mi pedido de PawArtStudio.\n\nNombre: ${orderForm.fullName}\nEmail: ${orderForm.email}\nTalla: ${selectedSize} | Color: ${selectedColor.name}\nTotal: $${subtotalEC.toFixed(2)} USD\n\nPor favor envíame los datos de la cuenta.`

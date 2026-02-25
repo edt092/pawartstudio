@@ -35,8 +35,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Transfer request notification error:", error);
-    // Devolver éxito igual para no bloquear al cliente
-    return NextResponse.json({ success: true });
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error("Transfer request notification error:", msg);
+    return NextResponse.json({ success: false, debug: msg }, { status: 500 });
   }
 }
