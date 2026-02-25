@@ -54,9 +54,9 @@ export async function POST(request: NextRequest) {
 
     if (!payphoneRes.ok) {
       const errText = await payphoneRes.text();
-      console.error("PayPhone Prepare error:", errText);
+      console.error("PayPhone Prepare error:", payphoneRes.status, errText);
       return NextResponse.json(
-        { error: "Error iniciando pago con PayPhone" },
+        { error: `Error PayPhone (${payphoneRes.status}): ${errText}` },
         { status: 500 }
       );
     }
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
     if (!paymentUrl) {
       console.error("PayPhone returned no payment URL:", payphoneData);
       return NextResponse.json(
-        { error: "No se obtuvo enlace de pago de PayPhone" },
+        { error: `PayPhone no retornó URL de pago: ${JSON.stringify(payphoneData)}` },
         { status: 500 }
       );
     }
