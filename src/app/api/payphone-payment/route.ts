@@ -24,15 +24,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // PayPhone espera storeId como entero
-    const storeId = parseInt(storeIdRaw, 10);
-    if (isNaN(storeId)) {
-      console.error("PAYPHONE_STORE_ID no es un número válido:", storeIdRaw);
-      return NextResponse.json(
-        { error: "Configuración de tienda inválida" },
-        { status: 500 }
-      );
-    }
+    const storeId = storeIdRaw;
 
     // PayPhone trabaja en centavos USD
     const amountInCents = Math.round(amount * 100);
