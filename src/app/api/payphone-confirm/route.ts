@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { sendTelegramMessage, sendTelegramPhoto } from "@/lib/telegram";
 
 export async function POST(request: NextRequest) {
   try {
@@ -70,6 +71,31 @@ export async function POST(request: NextRequest) {
     };
 
     console.log("New PayPhone order received:", order);
+
+    // Notificación a Telegram
+    try {
+      const amountUSD = (confirmData.amount / 100).toFixed(2);
+      const caption =
+        `💰 <b>PAGO CONFIRMADO — PayPhone</b>\n\n` +
+        `📋 <b>Pedido:</b> ${orderId}\n` +
+        `👤 <b>Cliente:</b> ${orderData?.fullName ?? "—"}\n` +
+        `📧 ${orderData?.email ?? "—"}\n` +
+        `📱 ${orderData?.whatsapp ?? "—"}\n` +
+        `📍 ${orderData?.address ?? "—"}\n\n` +
+        `👕 <b>Talla:</b> ${orderData?.tshirtSize ?? "—"} | <b>Color:</b> ${orderData?.tshirtColor ?? "—"}\n` +
+        `💵 <b>Total pagado:</b> $${amountUSD} USD\n` +
+        `🚚 <b>Envío:</b> $${orderData?.shippingCost?.toFixed(2) ?? "—"} USD\n\n` +
+        `🔖 <b>ID transacción:</b> <code>${clientTransactionId}</code>`;
+
+      if (orderData?.variantImage) {
+        await sendTelegramPhoto(orderData.variantImage, caption);
+      } else {
+        await sendTelegramMessage(caption);
+      }
+    } catch (tgErr) {
+      console.error("Telegram notification error:", tgErr);
+      // No fallar el pedido si Telegram falla
+    }
 
     return NextResponse.json({ success: true, orderId });
   } catch (error) {

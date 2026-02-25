@@ -230,12 +230,13 @@ export default function Home() {
             ? {
                 fullName: pending.orderForm.fullName,
                 email: pending.orderForm.email,
-                whatsapp: pending.orderForm.whatsapp,
+                whatsapp: `+593${pending.orderForm.whatsapp}`,
                 address: pending.orderForm.address,
                 selectedVariant: pending.selectedVariantIndex,
                 tshirtColor: pending.tshirtColor,
                 tshirtSize: pending.tshirtSize,
                 shippingCost: pending.shippingCost ?? 0,
+                variantImage: pending.variantImage ?? null,
               }
             : {},
         }),
@@ -474,6 +475,10 @@ export default function Home() {
         .toUpperCase()}`.slice(0, 20);
 
       // Guardar datos del pedido en localStorage para recuperarlos al volver
+      const selectedImage =
+        selectedVariantIndex !== null
+          ? artVariants[selectedVariantIndex]?.image ?? null
+          : null;
       localStorage.setItem(
         "pawphone_pending",
         JSON.stringify({
@@ -483,6 +488,7 @@ export default function Home() {
           tshirtColor: selectedColor.name,
           tshirtSize: selectedSize,
           shippingCost,
+          variantImage: selectedImage,
         })
       );
 
@@ -1516,17 +1522,43 @@ export default function Home() {
                         <p className="text-xs text-green-700">
                           Aceptamos todos los bancos de Ecuador. Solicita los datos de cuenta por WhatsApp.
                         </p>
-                        <a
-                          href="https://wa.me/yourphonenumber"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center justify-center gap-2 w-full py-4 rounded-xl font-bold text-lg bg-[#25D366] text-white hover:opacity-90 transition-opacity"
+                        <button
+                          type="button"
+                          disabled={!shippingCalculated}
+                          onClick={async () => {
+                            const selectedImage =
+                              selectedVariantIndex !== null
+                                ? artVariants[selectedVariantIndex]?.image ?? null
+                                : null;
+                            // Notificar a Telegram (no bloqueante)
+                            fetch("/api/transfer-request", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                fullName: orderForm.fullName,
+                                email: orderForm.email,
+                                whatsapp: `+593${orderForm.whatsapp}`,
+                                address: orderForm.address,
+                                tshirtSize: selectedSize,
+                                tshirtColor: selectedColor.name,
+                                shippingCost: shippingCost.toFixed(2),
+                                subtotal: subtotalEC.toFixed(2),
+                                variantImage: selectedImage,
+                              }),
+                            }).catch(() => {});
+                            // Abrir WhatsApp con mensaje prellenado
+                            const msg = encodeURIComponent(
+                              `Hola! Quiero pagar por transferencia mi pedido de PawArtStudio.\n\nNombre: ${orderForm.fullName}\nEmail: ${orderForm.email}\nTalla: ${selectedSize} | Color: ${selectedColor.name}\nTotal: $${subtotalEC.toFixed(2)} USD\n\nPor favor envíame los datos de la cuenta.`
+                            );
+                            window.open(`https://wa.me/593${process.env.NEXT_PUBLIC_WHATSAPP_NUMBER ?? ""}?text=${msg}`, "_blank");
+                          }}
+                          className="flex items-center justify-center gap-2 w-full py-4 rounded-xl font-bold text-lg bg-[#25D366] text-white hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                           <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.767 5.77 0 1.265.407 2.457 1.157 3.44l-1.157 3.39 3.51-1.152c.928.608 2.016.959 3.19.959 3.18 0 5.766-2.585 5.766-5.77 0-3.185-2.586-5.77-5.766-5.77zm4.211 8.24c-.171.482-.98.88-1.341.93-.362.05-.733.09-2.316-.54-1.583-.63-2.583-2.22-2.664-2.33-.081-.11-.663-.88-.663-1.69 0-.81.41-1.21.56-1.37.15-.16.33-.2.44-.2s.22-.01.32-.01c.1 0 .24-.04.37.27.14.33.47 1.15.51 1.24.04.09.06.19 0 .32-.06.13-.09.22-.19.33-.09.11-.2.25-.29.33-.1.09-.2.19-.08.38.11.19.51.84 1.1 1.37.76.68 1.4.89 1.6.99s.32.07.45-.08c.13-.15.54-.63.68-.84.15-.21.29-.18.49-.1s1.31.62 1.54.73c.23.11.38.17.44.27.05.11.05.62-.12 1.1z" />
                           </svg>
                           Solicitar datos por WhatsApp
-                        </a>
+                        </button>
                       </div>
                     </div>
                   ) : (
