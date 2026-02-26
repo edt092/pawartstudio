@@ -1,16 +1,17 @@
 @import "tailwindcss";
 
 @theme inline {
-  --color-primary: #ee5f2b;
-  --color-primary-light: rgba(238, 95, 43, 0.1);
-  --color-primary-medium: rgba(238, 95, 43, 0.25);
-  --color-background-light: #f8f6f6;
-  --color-background-dark: #221510;
+  --color-primary: #F97316;
+  --color-primary-light: rgba(249, 115, 22, 0.1);
+  --color-primary-medium: rgba(249, 115, 22, 0.25);
+  --color-background-light: #FAF9F7;
+  --color-background-dark: #1C1917;
   --font-display: "Plus Jakarta Sans", sans-serif;
 }
 
 body {
   font-family: "Plus Jakarta Sans", sans-serif;
+  background-color: #FAF9F7;
 }
 
 .material-symbols-outlined {
@@ -26,4 +27,50 @@ body {
 
 .btn-bounce {
   animation: btn-bounce 1.2s ease-in-out infinite;
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fade-up {
+  animation: fade-up 0.5s ease-out forwards;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.85); }
+}
+
+.pulse-dot {
+  animation: pulse-dot 1.5s ease-in-out infinite;
+}
+
+/* Smooth focus styles */
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: #F97316;
+  box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.12);
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #FAF9F7; }
+::-webkit-scrollbar-thumb { background: #e5e3e0; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #F97316; }
+
+/* Gallery carousel */
+@keyframes carousel-scroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.carousel-track {
+  animation: carousel-scroll 22s linear infinite;
+  will-change: transform;
+}
+
+.carousel-track:hover {
+  animation-play-state: paused;
 }

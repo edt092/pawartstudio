@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx create-next-app@latest:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run dev:*)",
+      "Bash(taskkill:*)",
+      "Bash(curl:*)",
+      "WebSearch",
+      "Bash(python:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(node -e:*)",
+      "Bash(xxd:*)",
+      "Bash(gh api:*)",
+      "Bash(xargs:*)",
+      "Bash(npx next build:*)",
+      "Bash(git add:*)",
+      "WebFetch(domain:docs.wompi.co)",
+      "Bash(cd E:/coding/proyectos-personales/activos/pawArtStudio && npx tsc --noEmit 2>&1)",
+      "Bash(cd:*)",
+      "mcp__ide__getDiagnostics",
+      "WebFetch(domain:www.docs.payphone.app)",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}
