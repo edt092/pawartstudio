@@ -1,80 +1,56 @@
-# PawArtStudio
+# PawArt Studio 🎨 🐾
 
-Tienda online para camisetas personalizadas con arte generado por IA a partir de fotos de mascotas. Los clientes suben una foto de su mascota, generan variantes de arte con IA, eligen diseño, talla y color, y pagan directamente en el sitio.
+**PawArt Studio** is a cutting-edge e-commerce application that leverages Generative AI to create custom apparel. Users can upload photos of their pets, generate unique artistic renditions using Google's Gemini models, visualize the result on a 3D t-shirt model, and complete the purchase via region-specific payment gateways.
 
-## Características
+![Project Banner](public/model.jpg) <!-- Reemplaza esto con una captura de pantalla real de tu UI si tienes una -->
 
-- Generación de arte con IA (Google Gemini) a partir de fotos de mascotas
-- Vista previa 3D de la camiseta con el diseño seleccionado
-- Cálculo de envío estimado por geolocalización
-- Pagos para **Ecuador** con PayPhone (Cajita de Pagos — widget embebido)
-- Pagos para **Colombia** con Wompi
-- Opción de transferencia bancaria (Ecuador) y Nequi (Colombia)
-- Notificaciones automáticas por Telegram al confirmar cada pedido
-- Detección automática de país por IP
+## 🚀 Technical Highlights
 
-## Stack
+This project demonstrates the integration of multi-modal AI, 3D rendering, and complex state management in a modern web architecture.
 
+- **Next.js 15 (App Router):** Utilizes the latest React Server Components and Server Actions for optimized performance and SEO.
+- **Generative AI Pipeline:** Implements a two-step AI process using **Google Gemini 2.0 Flash**:
+  1.  **Vision Analysis:** Analyzes the uploaded pet image to generate a precise textual description.
+  2.  **Image Generation:** Uses the description + style prompts to generate high-quality artistic variations while preserving the pet's likeness.
+- **3D Visualization:** Integrates **Three.js** (via React Three Fiber) to map the generated AI art onto a 3D t-shirt model, allowing users to rotate and preview their custom product in real-time.
+- **Dynamic Payments:** Features a geolocation-based payment routing system that dynamically loads **Wompi** for Colombia and **PayPhone** for Ecuador.
+- **Serverless Architecture:** Fully deployed on Netlify with serverless functions handling API requests and webhooks.
+
+## 🛠 Tech Stack
+
+### Frontend
 - **Framework:** Next.js 15 (App Router)
-- **Despliegue:** Netlify
-- **IA:** Google Gemini API
-- **Pagos EC:** PayPhone (Cajita de Pagos)
-- **Pagos CO:** Wompi
-- **Notificaciones:** Telegram Bot API
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS
+- **3D Rendering:** React Three Fiber / Drei
+- **State Management:** React Hooks (Context/State)
 
-## Variables de entorno
+### Backend & Services
+- **API:** Next.js API Routes (Serverless)
+- **AI Model:** Google Gemini API (Vision & Image Generation)
+- **Notifications:** Telegram Bot API (Real-time order alerts)
+- **Payments:** Wompi (Widget integration), PayPhone (Embedded box)
 
-Crea un archivo `.env.local` con:
+## ⚡ Key Features
 
-```env
-# IA
-PawArtStudioKey=...
+1.  **AI-Powered Art Generation:** Users receive 3 unique artistic variants (Watercolor, Pop Art, Cyberpunk, etc.) based on their pet's photo.
+2.  **Interactive 3D Preview:** A realistic 3D canvas allows users to see exactly how the print looks on different fabric colors.
+3.  **Smart Checkout:**
+    - Automatic country detection via IP.
+    - Conditional loading of payment scripts to optimize performance.
+    - Real-time transaction verification.
+4.  **Automated Operations:** Instant order notifications sent to administrators via Telegram with order details and generated assets.
 
-# Wompi (Colombia)
-NEXT_PUBLIC_WOMPI_PUBLIC_KEY=...
-WOMPI_INTEGRITY_SECRET=...
-
-# PayPhone (Ecuador)
-PAYPHONE_TOKEN=...
-PAYPHONE_STORE_ID=...
-
-# Telegram (notificaciones de pedidos)
-TELEGRAM_BOT_TOKEN=...
-TELEGRAM_CHAT_ID=...
-
-# General
-NEXT_PUBLIC_BASE_URL=https://tudominio.com
-```
-
-## Flujo de pago Ecuador (PayPhone)
-
-1. Cliente llena formulario → click "Ir a pagar con PayPhone"
-2. Se inicializa el widget `PPaymentButtonBox` directamente en la página
-3. Cliente paga → PayPhone redirige de vuelta con `?id=&clientTransactionId=`
-4. El sitio confirma la transacción en `/api/payphone-confirm`
-5. Se envía notificación a Telegram con foto del diseño y datos del pedido
-
-## Flujo transferencia bancaria
-
-1. Cliente llena formulario → click "Solicitar datos por WhatsApp"
-2. Se envía notificación a Telegram (pedido pendiente de pago)
-3. WhatsApp se abre con mensaje prellenado con los datos del pedido
-
-## APIs internas
-
-| Endpoint | Descripción |
-|---|---|
-| `POST /api/generate` | Genera arte con Gemini |
-| `GET /api/payphone-config` | Devuelve token/storeId de PayPhone al cliente |
-| `POST /api/payphone-confirm` | Confirma transacción PayPhone y notifica Telegram |
-| `POST /api/transfer-request` | Registra solicitud de transferencia y notifica Telegram |
-| `POST /api/wompi-payment` | Crea referencia de pago Wompi |
-
-## Desarrollo local
+## 📂 Project Structure
 
 ```bash
-npm install
-npm run dev
-```
+src/
+├── app/
+│   ├── api/            # Serverless functions (Gemini, Payments, Orders)
+│   ├── page.tsx        # Main application logic (Wizard flow)
+│   └── layout.tsx      # Root layout and metadata
+├── components/
+│   ├── TshirtPreview3D # Three.js component for product visualization
+│   └── icons/          # Custom SVG iconography
+└── lib/                # Utility functions and types
 
-Abre [http://localhost:3000](http://localhost:3000). Para simular Ecuador usa `?country=EC` en la URL, para Colombia `?country=CO`.
